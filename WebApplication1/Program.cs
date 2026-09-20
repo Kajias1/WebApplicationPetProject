@@ -1,7 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+
 
 var app = builder.Build();
 
@@ -13,30 +20,46 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild",
-    "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-    {
-        var forecast = Enumerable.Range(1, 5)
-            .Select(index =>
-                new WeatherForecast(
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-
-        return forecast;
-    })
-    .WithName("GetWeatherForecast");
+app.MapGet("/hello", () => "Hello World!")
+    .WithName("GetHelloWorld");
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+public class User
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string PasswordHash { get; set; } = "";
+    public decimal Balance { get; set; }
+}
+
+public enum OperationType { Deposit, Withdraw }
+
+public class Operation
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+    public OperationType Type { get; set; }
+    public decimal Amount { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+{
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Operation> Operations => Set<Operation>();
+
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        builder.Entity<User>(e =>
+        {
+            e.Property(u => u.Name).HasMaxLength(50);
+            e.HasIndex(u => u.Name).IsUnique();          // имена не повторяются
+            e.Property(u => u.Balance).HasPrecision(18, 2);
+        });
+
+        builder.Entity<Operation>()
+            .Property(o => o.Amount).HasPrecision(18, 2);
+    }
 }
