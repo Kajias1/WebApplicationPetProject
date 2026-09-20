@@ -45,6 +45,13 @@ public class Operation
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public record CredentialsDto(
+    [Required, MaxLength(50)] string Name,
+    [Required, MinLength(6)] string Password);
+
+public record AmountDto(decimal Amount);
+public record BalanceDto(decimal Balance);
+
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
