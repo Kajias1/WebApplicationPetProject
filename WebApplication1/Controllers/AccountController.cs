@@ -42,7 +42,6 @@ public class AccountController(AppDbContext db) : ControllerBase
 
         await using var tx = await db.Database.BeginTransactionAsync();
 
-        // Одно атомарное UPDATE с проверкой: баланс не уйдёт в минус
         var updated = await db.Users
             .Where(u => u.Id == userId && u.Balance + delta >= 0)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => u.Balance + delta));

@@ -14,6 +14,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -24,7 +25,6 @@ builder.Services
         options.ExpireTimeSpan = TimeSpan.FromHours(1);
         options.SlidingExpiration = true;
 
-        // Для API вместо редиректа на страницу входа отдаём коды 401/403
         options.Events.OnRedirectToLogin = ctx =>
         {
             ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -90,11 +90,51 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         builder.Entity<User>(e =>
         {
             e.Property(u => u.Name).HasMaxLength(50);
-            e.HasIndex(u => u.Name).IsUnique();          // имена не повторяются
+            e.HasIndex(u => u.Name).IsUnique();
             e.Property(u => u.Balance).HasPrecision(18, 2);
         });
 
         builder.Entity<Operation>()
             .Property(o => o.Amount).HasPrecision(18, 2);
+    }
+}
+
+public enum RegisterStatus { Success, NameTaken }
+
+public record RegisterResult(RegisterStatus Status, User? User = null);
+
+public interface IAuthService
+{
+    Task<RegisterResult> RegisterAsync(CredentialsDto dto);
+    Task<User?> ValidateCredentialsAsync(CredentialsDto dto);
+}
+
+public class AuthService(AppDbContext db, IPasswordHasher<User> hasher) : IAuthService
+{
+    public async Task<RegisterResult> RegisterAsync(CredentialsDto dto)
+    {
+        var name = dto.Name.Trim();
+        if (await db.Users.AnyAsync(u => u.Name == name))
+            return new RegisterResult(RegisterStatus.NameTaken);
+
+        var user = new User { Name = name };
+        user.PasswordHash = hasher.HashPassword(user, dto.Password);
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        return new RegisterResult(RegisterStatus.Success, user);
+    }
+
+    public async Task<User?> ValidateCredentialsAsync(CredentialsDto dto)
+    {
+        var name = dto.Name.Trim();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Name == name);
+
+        if (user is null ||
+            hasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password)
+            == PasswordVerificationResult.Failed)
+            return null;
+
+        return user;
     }
 }

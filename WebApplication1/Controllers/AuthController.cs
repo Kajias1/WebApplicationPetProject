@@ -10,32 +10,25 @@ namespace WebApplication1.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(AppDbContext db, IPasswordHasher<User> hasher) : ControllerBase
+public class AuthController(IAuthService auth) : ControllerBase
 {
     [HttpPost("register")]
     public async Task<IActionResult> Register(CredentialsDto dto)
     {
-        var name = dto.Name.Trim();
-        if (await db.Users.AnyAsync(u => u.Name == name))
-            return Conflict("Пользователь с таким именем уже существует");
+        var result = await auth.RegisterAsync(dto);
 
-        var user = new User { Name = name };
-        user.PasswordHash = hasher.HashPassword(user, dto.Password);
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-
-        return Ok(new { user.Id, user.Name });
+        return result.Status switch
+        {
+            RegisterStatus.NameTaken => Conflict("Пользователь с таким именем уже существует"),
+            _ => Ok(new { result.User!.Id, result.User.Name })
+        };
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(CredentialsDto dto)
     {
-        var name = dto.Name.Trim();
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Name == name);
-
-        if (user is null ||
-            hasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password)
-            == PasswordVerificationResult.Failed)
+        var user = await auth.ValidateCredentialsAsync(dto);
+        if (user is null)
             return Unauthorized("Неверное имя или пароль");
 
         var claims = new List<Claim>
