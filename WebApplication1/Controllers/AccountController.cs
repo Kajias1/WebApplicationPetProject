@@ -7,6 +7,9 @@ using WebApplication1.Services;
 
 namespace WebApplication1.Controllers;
 
+/// <summary>
+/// Endpoints for depositing, withdrawing and displaying current user's balance
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
