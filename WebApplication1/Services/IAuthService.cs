@@ -5,6 +5,6 @@ namespace WebApplication1.Services;
 
 public interface IAuthService
 {
-    Task<RegisterResult> RegisterAsync(CredentialsDto dto);
-    Task<User?> ValidateCredentialsAsync(CredentialsDto dto);
+    Task<User> RegisterAsync(CredentialsDto dto);
+    Task<User> ValidateCredentialsAsync(CredentialsDto dto);
 }

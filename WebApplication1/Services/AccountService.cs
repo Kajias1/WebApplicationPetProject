@@ -12,11 +12,11 @@ public class AccountService(AppDbContext db) : IAccountService
             .Select(u => u.Balance)
             .SingleAsync();
 
-    public async Task<ChangeBalanceResult> ChangeBalanceAsync(
+    public async Task<decimal> ChangeBalanceAsync(
         int userId, decimal amount, OperationType type)
     {
         if (amount <= 0 || decimal.Round(amount, 2) != amount)
-            return new ChangeBalanceResult(ChangeBalanceStatus.InvalidAmount);
+            throw new InvalidAmountException();
 
         var delta = type == OperationType.Deposit ? amount : -amount;
 
@@ -27,14 +27,13 @@ public class AccountService(AppDbContext db) : IAccountService
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => u.Balance + delta));
 
         if (updated == 0)
-            return new ChangeBalanceResult(ChangeBalanceStatus.InsufficientFunds);
+            throw new InsufficientFundsException();
 
         db.Operations.Add(new Operation { UserId = userId, Type = type, Amount = amount });
         await db.SaveChangesAsync();
 
         var balance = await GetBalanceAsync(userId);
-
         await tx.CommitAsync();
-        return new ChangeBalanceResult(ChangeBalanceStatus.Success, balance);
+        return balance;
     }
 }

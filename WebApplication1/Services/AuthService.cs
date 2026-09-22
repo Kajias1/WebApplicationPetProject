@@ -8,21 +8,21 @@ namespace WebApplication1.Services;
 
 public class AuthService(AppDbContext db, IPasswordHasher<User> hasher) : IAuthService
 {
-    public async Task<RegisterResult> RegisterAsync(CredentialsDto dto)
+    public async Task<User> RegisterAsync(CredentialsDto dto)
     {
         var name = dto.Name.Trim();
         if (await db.Users.AnyAsync(u => u.Name == name))
-            return new RegisterResult(RegisterStatus.NameTaken);
+            throw new NameTakenException();
 
         var user = new User { Name = name };
         user.PasswordHash = hasher.HashPassword(user, dto.Password);
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        return new RegisterResult(RegisterStatus.Success, user);
+        return user;
     }
 
-    public async Task<User?> ValidateCredentialsAsync(CredentialsDto dto)
+    public async Task<User> ValidateCredentialsAsync(CredentialsDto dto)
     {
         var name = dto.Name.Trim();
         var user = await db.Users.FirstOrDefaultAsync(u => u.Name == name);
@@ -30,7 +30,7 @@ public class AuthService(AppDbContext db, IPasswordHasher<User> hasher) : IAuthS
         if (user is null ||
             hasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password)
             == PasswordVerificationResult.Failed)
-            return null;
+            throw new InvalidCredentialsException();
 
         return user;
     }

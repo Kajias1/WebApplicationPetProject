@@ -15,21 +15,14 @@ public class AuthController(IAuthService auth) : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register(CredentialsDto dto)
     {
-        var result = await auth.RegisterAsync(dto);
-
-        return result.Status switch
-        {
-            RegisterStatus.NameTaken => Conflict("Пользователь с таким именем уже существует"),
-            _ => Ok(new { result.User!.Id, result.User.Name })
-        };
+        var user = await auth.RegisterAsync(dto);
+        return Ok(new { user.Id, user.Name });
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(CredentialsDto dto)
     {
         var user = await auth.ValidateCredentialsAsync(dto);
-        if (user is null)
-            return Unauthorized("Неверное имя или пароль");
 
         var claims = new List<Claim>
         {
