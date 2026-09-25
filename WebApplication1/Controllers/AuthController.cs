@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using WebApplication1.Dtos;
 using WebApplication1.Services;
 
@@ -38,6 +39,7 @@ public class AuthController(IAuthService auth, ITokenService tokens) : Controlle
     /// <response code="400">The request failed validation.</response>
     /// <response code="401">The name or password is incorrect.</response>
     [HttpPost("login")]
+    [EnableRateLimiting("login")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
