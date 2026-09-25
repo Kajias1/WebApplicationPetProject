@@ -6,7 +6,7 @@ A small bank-style ASP.NET Core Web API. Users can register, log in, and deposit
 
 - **.NET 10** / ASP.NET Core Web API
 - **PostgreSQL** via Entity Framework Core (`Npgsql.EntityFrameworkCore.PostgreSQL`)
-- **Cookie authentication** (`Microsoft.AspNetCore.Authentication.Cookies`)
+- **JWT authentication** (`Microsoft.AspNetCore.Authentication.JwtBearer`)
 - **Swagger / OpenAPI** via Swashbuckle
 - **xUnit + Moq** for unit testing, with EF Core InMemory and SQLite providers
 
@@ -28,6 +28,8 @@ WebApplication1.Tests/
 ├── AccountServiceTests.cs
 └── TestHelpers.cs
 ```
+
+`AuthService` verifies credentials; `TokenService` (in `Services/`) issues JWTs on successful login.
 
 ## Prerequisites
 
@@ -51,6 +53,14 @@ Set the PostgreSQL connection string using [User Secrets](https://learn.microsof
 ```bash
 cd WebApplication1
 dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Database=bankdb;Username=youruser;Password=yourpassword"
+```
+
+Set the JWT signing key and token issuer/audience the same way (the key must be at least 32 characters):
+
+```bash
+dotnet user-secrets set "Jwt:Key" "a-long-random-secret-at-least-32-characters"
+dotnet user-secrets set "Jwt:Issuer" "WebApplication1"
+dotnet user-secrets set "Jwt:Audience" "WebApplication1Client"
 ```
 
 ### 3. Apply migrations
@@ -80,12 +90,12 @@ Tests cover `AuthService` and `AccountService` in isolation, using an in-memory 
 ### Auth (`/api/auth`)
 
 | Method | Route | Description | Auth required |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | POST | `/api/auth/register` | Register a new user | No |
-| POST | `/api/auth/login` | Log in and receive an auth cookie | No |
-| POST | `/api/auth/logout` | Log out and clear the auth cookie | Yes |
+| POST | `/api/auth/login` | Log in and receive a JWT | No |
 
 **Request body** (`register` / `login`):
+
 ```json
 {
   "name": "alice",
@@ -93,17 +103,34 @@ Tests cover `AuthService` and `AccountService` in isolation, using an in-memory 
 }
 ```
 
+**Login response**:
+
+```json
+{
+  "token": "eyJhbGciOi...",
+  "id": 1,
+  "name": "alice"
+}
+```
+
+There is no `logout` endpoint: JWTs are stateless, so the server has nothing to clear. "Logging out" means the client discards the token it's holding. Include the token on later requests as:
+
+```
+Authorization: Bearer <token>
+```
+
 ### Account (`/api/account`)
 
-All endpoints require authentication (cookie).
+All endpoints require authentication (`Authorization: Bearer <token>`).
 
 | Method | Route | Description |
-|---|---|---|
+| --- | --- | --- |
 | GET | `/api/account/balance` | Get the current user's balance |
 | POST | `/api/account/deposit` | Deposit an amount into the balance |
 | POST | `/api/account/withdraw` | Withdraw an amount from the balance |
 
 **Request body** (`deposit` / `withdraw`):
+
 ```json
 {
   "amount": 50.00
@@ -111,6 +138,7 @@ All endpoints require authentication (cookie).
 ```
 
 **Response** (all account endpoints):
+
 ```json
 {
   "balance": 150.00
@@ -130,7 +158,7 @@ Errors are returned in a consistent [`ProblemDetails`](https://datatracker.ietf.
 ```
 
 | Status | Meaning |
-|---|---|
+| --- | --- |
 | 400 | Invalid input (bad amount, failed validation) |
 | 401 | Not authenticated, or invalid login credentials |
 | 409 | Username already taken |
