@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: bank
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrations:
+    build:
+      context: .
+      target: migration
+    environment:
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=bank;Username=postgres;Password=${POSTGRES_PASSWORD}"
+      Jwt__Key: "${JWT_KEY}"
+      Jwt__Issuer: "WebApplication1"
+      Jwt__Audience: "WebApplication1Client"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=bank;Username=postgres;Password=${POSTGRES_PASSWORD}"
+      Jwt__Key: "${JWT_KEY}"
+      Jwt__Issuer: "WebApplication1"
+      Jwt__Audience: "WebApplication1Client"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:

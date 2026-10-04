@@ -8,3 +8,4 @@ riderModule.iml
 *.user
 *.suo.DS_Store
 .DS_Store
+.env
