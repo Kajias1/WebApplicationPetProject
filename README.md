@@ -38,7 +38,9 @@ WebApplication1.Tests/
 
 ## Setup
 
-### 1. Clone and restore
+### Option 1 — Run locally
+
+#### 1. Clone and restore
 
 ```bash
 git clone <repo-url>
@@ -46,36 +48,156 @@ cd WebApplication1
 dotnet restore
 ```
 
-### 2. Configure the database connection
+#### 2. Configure the database connection
 
 Set the PostgreSQL connection string using [User Secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) (do not commit real credentials to `appsettings.json`):
 
 ```bash
 cd WebApplication1
-dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Database=bankdb;Username=youruser;Password=yourpassword"
+
+dotnet user-secrets set "ConnectionStrings:Default" \
+  "Host=localhost;Database=bankdb;Username=youruser;Password=yourpassword"
 ```
 
-Set the JWT signing key and token issuer/audience the same way (the key must be at least 32 characters):
+Set the JWT signing key and token issuer/audience the same way. The signing key must be at least 32 characters:
 
 ```bash
-dotnet user-secrets set "Jwt:Key" "a-long-random-secret-at-least-32-characters"
-dotnet user-secrets set "Jwt:Issuer" "WebApplication1"
-dotnet user-secrets set "Jwt:Audience" "WebApplication1Client"
+dotnet user-secrets set "Jwt:Key" \
+  "a-long-random-secret-at-least-32-characters"
+
+dotnet user-secrets set "Jwt:Issuer" \
+  "WebApplication1"
+
+dotnet user-secrets set "Jwt:Audience" \
+  "WebApplication1Client"
 ```
 
-### 3. Apply migrations
+#### 3. Apply migrations
 
 ```bash
 dotnet ef database update
 ```
 
-### 4. Run the app
+#### 4. Run the app
 
 ```bash
 dotnet run
 ```
 
-The API will be available at the URL printed in the console (e.g. `https://localhost:5001`). In development mode, Swagger UI is available at `/swagger`.
+The API will be available at the URL printed in the console, for example:
+
+```text
+https://localhost:5001
+```
+
+In development mode, Swagger UI is available at:
+
+```text
+/swagger
+```
+
+---
+
+### Option 2 — Run with Docker
+
+Docker Compose can start PostgreSQL, apply Entity Framework Core migrations, and start the API automatically.
+
+#### 1. Configure environment variables
+
+Create a `.env` file in the same directory as `docker-compose.yml`:
+
+```env
+POSTGRES_PASSWORD=yourpassword
+
+JWT_KEY=a-long-random-secret-at-least-32-characters
+JWT_ISSUER=WebApplication1
+JWT_AUDIENCE=WebApplication1Client
+```
+
+Do not commit the `.env` file containing real credentials or secrets.
+
+Make sure `.env` is included in `.gitignore`:
+
+```gitignore
+.env
+```
+
+#### 2. Start the application
+
+From the directory containing `docker-compose.yml`, run:
+
+```bash
+docker compose up --build -d
+```
+
+Docker Compose will:
+
+1. Start PostgreSQL.
+2. Wait until PostgreSQL is healthy.
+3. Run Entity Framework Core migrations.
+4. Start the API only after the migrations complete successfully.
+
+The API will be available at:
+
+```text
+http://localhost:8080
+```
+
+Swagger UI is available in development mode at:
+
+```text
+http://localhost:8080/swagger
+```
+
+#### 3. Check container status
+
+```bash
+docker compose ps -a
+```
+
+The migration container is expected to exit with code `0` after successfully applying migrations.
+
+Example:
+
+```text
+postgres     Up (healthy)
+migrations   Exited (0)
+api          Up
+```
+
+#### 4. View logs
+
+API logs:
+
+```bash
+docker compose logs -f api
+```
+
+Migration logs:
+
+```bash
+docker compose logs migrations
+```
+
+PostgreSQL logs:
+
+```bash
+docker compose logs -f postgres
+```
+
+#### 5. Stop the application
+
+```bash
+docker compose down
+```
+
+To also remove the PostgreSQL volume and delete the local database data:
+
+```bash
+docker compose down -v
+```
+
+> **Note:** `docker compose down -v` permanently removes the PostgreSQL data stored in the Docker volume.
 
 ## Running tests
 
