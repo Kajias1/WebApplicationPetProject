@@ -6,4 +6,5 @@ riderModule.iml
 .idea/
 .vs/
 *.user
-*.suo
+*.suo.DS_Store
+.DS_Store
