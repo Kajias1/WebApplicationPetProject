@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -14,6 +15,26 @@ using WebApplication1.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var firstError = context.ModelState
+            .SelectMany(kvp => kvp.Value?.Errors ?? [])
+            .Select(e => e.ErrorMessage)
+            .FirstOrDefault() ?? "Ошибка валидации";
+
+        return new ObjectResult(new
+        {
+            title = firstError,
+            status = StatusCodes.Status400BadRequest,
+            instance = context.HttpContext.Request.Path.Value
+        })
+        {
+            StatusCode = StatusCodes.Status400BadRequest
+        };
+    };
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -85,6 +106,26 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var httpContext = statusCodeContext.HttpContext;
+    httpContext.Response.ContentType = "application/json";
+
+    var title = httpContext.Response.StatusCode switch
+    {
+        401 => "Не авторизован",
+        403 => "Доступ запрещён",
+        404 => "Не найдено",
+        _ => "Произошла ошибка"
+    };
+
+    await httpContext.Response.WriteAsJsonAsync(new
+    {
+        title,
+        status = httpContext.Response.StatusCode,
+        instance = httpContext.Request.Path.Value
+    });
+});
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
